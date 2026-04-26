@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deficit — Calorie & Cycling Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0e0f0e;
+    --surface: #161817;
+    --surface2: #1e201f;
+    --border: #2a2d2b;
+    --accent: #b5f04d;
+    --accent2: #4df0a0;
+    --red: #f04d4d;
+    --text: #e8ede9;
+    --muted: #6b7569;
+    --font-display: 'Syne', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    padding: 24px 16px 60px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  /* ── Auth screen ── */
+  #auth-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    margin: -24px -16px;
+  }
+
+  .auth-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 36px 28px;
+    width: 100%;
+    max-width: 360px;
+    text-align: center;
+  }
+
+  .auth-logo {
+    font-family: var(--font-display);
+    font-size: 3rem;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -0.03em;
+    margin-bottom: 6px;
+  }
+
+  .auth-sub {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+  }
+
+  .auth-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 3px;
+    margin-bottom: 20px;
+  }
+
+  .auth-tab {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .auth-tab.active {
+    background: var(--surface);
+    color: var(--accent);
+    border: 1px solid var(--border);
+  }
+
+  .auth-error {
+    font-size: 0.72rem;
+    color: var(--red);
+    margin-top: 10px;
+    min-height: 18px;
+  }
+
+  .auth-success {
+    font-size: 0.72rem;
+    color: var(--accent2);
+    margin-top: 10px;
+    min-height: 18px;
+  }
+
+  /* ── App screen ── */
+  #app-screen { display: none; }
+
+  header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 36px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(2rem, 6vw, 3.5rem);
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: var(--accent);
+  }
+
+  .subtitle {
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  .header-right { text-align: right; }
+
+  .header-stat .val {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .header-stat .label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .btn-signout {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.6rem;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: right;
+  }
+
+  .btn-signout:hover { color: var(--red); }
+
+  /* ── Grid ── */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 600px) { .grid, .grid-3 { grid-template-columns: 1fr; } }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .card-title { font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+
+  label { display: block; font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; margin-top: 12px; }
+  label:first-of-type { margin-top: 0; }
+
+  input[type="number"], input[type="text"], input[type="email"], input[type="password"], select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input:focus, select:focus { border-color: var(--accent); }
+  select option { background: var(--surface2); }
+
+  .radio-group { display: flex; gap: 8px; flex-wrap: wrap; }
+  .radio-group label { margin: 0; flex: 1; min-width: 70px; }
+
+  .radio-btn {
+    display: block;
+    text-align: center;
+    padding: 8px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: all 0.15s;
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+
+  input[type="radio"] { display: none; }
+  input[type="radio"]:checked + .radio-btn { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 500; }
+
+  .stat-block { text-align: center; }
+  .stat-big { font-family: var(--font-display); font-size: 3rem; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+  .stat-big.green { color: var(--accent); }
+  .stat-big.red { color: var(--red); }
+  .stat-big.cyan { color: var(--accent2); }
+  .stat-unit { font-size: 0.7rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+
+  .progress-wrap { background: var(--surface2); border-radius: 100px; height: 6px; margin: 16px 0 8px; overflow: hidden; }
+  .progress-bar { height: 100%; border-radius: 100px; background: var(--accent); transition: width 0.4s ease; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--muted); }
+
+  /* ── Calendar ── */
+  .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .cal-nav { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: var(--font-mono); font-size: 1rem; padding: 6px 14px; cursor: pointer; transition: border-color 0.15s; }
+  .cal-nav:hover { border-color: var(--accent); color: var(--accent); }
+  .cal-month { font-family: var(--font-display); font-size: 1.2rem; font-weight: 700; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-day-name { text-align: center; font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 4px 0 8px; }
+  .cal-day { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; transition: all 0.15s; border: 1px solid transparent; position: relative; font-size: 0.8rem; }
+  .cal-day:hover { border-color: var(--border); background: var(--surface2); }
+  .cal-day.empty { cursor: default; }
+  .cal-day.empty:hover { border-color: transparent; background: transparent; }
+  .cal-day.today { border-color: var(--accent); color: var(--accent); }
+  .cal-day.logged { background: var(--surface2); border-color: var(--border); }
+  .cal-day.logged.deficit { border-color: rgba(181,240,77,0.4); }
+  .cal-day.logged.surplus { border-color: rgba(240,77,77,0.3); }
+  .cal-day.logged.cycling::after { content: '🚲'; font-size: 0.55rem; position: absolute; bottom: 2px; }
+  .day-dot { width: 5px; height: 5px; border-radius: 50%; margin-top: 2px; }
+  .day-dot.green { background: var(--accent); }
+  .day-dot.red { background: var(--red); }
+
+  /* ── Modal ── */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 100; align-items: center; justify-content: center; padding: 16px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; animation: slideUp 0.2s ease; }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal-title { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; margin-bottom: 6px; }
+  .modal-total { font-size: 0.72rem; color: var(--muted); margin-bottom: 20px; }
+  .modal-total span { color: var(--accent); font-weight: 500; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+
+  .btn { flex: 1; padding: 12px; border-radius: 8px; border: none; cursor: pointer; font-family: var(--font-mono); font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; transition: all 0.15s; }
+  .btn-primary { background: var(--accent); color: var(--bg); font-weight: 500; }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-primary:disabled { opacity: 0.5; cursor: default; }
+  .btn-secondary { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .btn-secondary:hover { color: var(--text); border-color: var(--text); }
+  .btn-danger { background: transparent; color: var(--red); border: 1px solid rgba(240,77,77,0.3); }
+
+  /* ── Food diary ── */
+  .food-search-wrap { display: flex; gap: 8px; margin-bottom: 10px; }
+  .food-search-wrap input { flex: 1; margin: 0; }
+  .btn-search { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--accent); font-family: var(--font-mono); font-size: 0.8rem; padding: 0 16px; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
+  .btn-search:hover { border-color: var(--accent); }
+  .btn-search:disabled { opacity: 0.4; cursor: default; }
+  .search-results { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; max-height: 200px; overflow-y: auto; margin-bottom: 12px; display: none; }
+  .search-results.open { display: block; }
+  .search-result-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  .search-result-item:last-child { border-bottom: none; }
+  .search-result-item:hover { background: rgba(181,240,77,0.06); }
+  .sri-name { font-size: 0.82rem; }
+  .sri-meta { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
+  .sri-kcal { color: var(--accent); }
+  .search-status { font-size: 0.72rem; color: var(--muted); padding: 8px 0; text-align: center; }
+
+  .portion-picker { background: var(--surface2); border: 1px solid var(--accent); border-radius: 8px; padding: 14px; margin-bottom: 12px; display: none; }
+  .portion-picker.open { display: block; }
+  .portion-name { font-size: 0.82rem; margin-bottom: 10px; color: var(--accent2); }
+  .portion-row { display: flex; gap: 8px; align-items: center; }
+  .portion-row input { flex: 1; margin: 0; }
+  .portion-unit { font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
+  .portion-kcal { font-size: 0.9rem; color: var(--accent); font-weight: 500; min-width: 70px; text-align: right; }
+  .btn-add-food { width: 100%; margin-top: 10px; padding: 9px; background: rgba(181,240,77,0.12); border: 1px solid var(--accent); border-radius: 8px; color: var(--accent); font-family: var(--font-mono); font-size: 0.78rem; cursor: pointer; transition: all 0.15s; }
+  .btn-add-food:hover { background: rgba(181,240,77,0.2); }
+
+  .food-log-list { margin-bottom: 12px; }
+  .food-log-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px dotted var(--border); font-size: 0.78rem; }
+  .food-log-item:last-child { border-bottom: none; }
+  .fli-name { flex: 1; }
+  .fli-portion { color: var(--muted); font-size: 0.68rem; }
+  .fli-kcal { color: var(--accent); min-width: 55px; text-align: right; }
+  .fli-remove { color: var(--red); cursor: pointer; font-size: 1rem; padding: 0 4px; opacity: 0.6; }
+  .fli-remove:hover { opacity: 1; }
+  .food-log-breakfast { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px dotted var(--border); font-size: 0.78rem; opacity: 0.6; }
+  .food-total-row { display: flex; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--border); font-size: 0.82rem; }
+  .food-total-row .total-kcal { color: var(--accent); font-weight: 500; font-size: 1rem; }
+
+  /* ── Tabs ── */
+  .tab-bar { display: flex; gap: 4px; background: var(--surface2); border-radius: 8px; padding: 3px; margin-bottom: 12px; }
+  .tab-btn { flex: 1; padding: 7px 4px; border: none; border-radius: 6px; background: transparent; color: var(--muted); font-family: var(--font-mono); font-size: 0.65rem; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; transition: all 0.15s; }
+  .tab-btn.active { background: var(--surface); color: var(--accent); border: 1px solid var(--border); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── Manual entry ── */
+  .manual-row { display: grid; grid-template-columns: 1fr 80px 80px; gap: 8px; align-items: end; margin-bottom: 8px; }
+  .manual-row input { margin: 0; }
+  .btn-add-manual { width: 100%; padding: 10px; background: rgba(181,240,77,0.12); border: 1px solid var(--accent); border-radius: 8px; color: var(--accent); font-family: var(--font-mono); font-size: 0.75rem; cursor: pointer; transition: all 0.15s; margin-top: 4px; }
+  .btn-add-manual:hover { background: rgba(181,240,77,0.22); }
+
+  /* ── Favourites ── */
+  .favourites-list { max-height: 220px; overflow-y: auto; }
+  .fav-item { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px dotted var(--border); cursor: pointer; transition: opacity 0.1s; }
+  .fav-item:last-child { border-bottom: none; }
+  .fav-item:hover { opacity: 0.8; }
+  .fav-name { flex: 1; font-size: 0.78rem; }
+  .fav-kcal { font-size: 0.72rem; color: var(--accent); }
+  .fav-remove { color: var(--red); font-size: 0.9rem; opacity: 0.5; padding: 0 4px; }
+  .fav-remove:hover { opacity: 1; }
+  .fav-empty { font-size: 0.72rem; color: var(--muted); text-align: center; padding: 20px 0; }
+
+  /* ── Toggle switch ── */
+  .toggle-switch { display: flex; align-items: center; gap: 10px; margin-top: 12px; cursor: pointer; }
+  .switch-track { width: 40px; height: 22px; background: var(--surface2); border: 1px solid var(--border); border-radius: 100px; position: relative; transition: background 0.2s; }
+  .switch-thumb { width: 16px; height: 16px; background: var(--muted); border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: all 0.2s; }
+  .switch-track.on { background: rgba(181,240,77,0.2); border-color: var(--accent); }
+  .switch-track.on .switch-thumb { background: var(--accent); transform: translateX(18px); }
+  .switch-label { font-size: 0.75rem; color: var(--text); }
+
+  /* ── Misc ── */
+  .section-full { margin-bottom: 16px; }
+  .breakdown-row { display: flex; justify-content: space-between; font-size: 0.78rem; padding: 5px 0; border-bottom: 1px dotted var(--border); }
+  .breakdown-row:last-child { border: none; }
+  .breakdown-row .lbl { color: var(--muted); }
+  .total-row { display: flex; justify-content: space-between; padding-top: 10px; margin-top: 4px; border-top: 1px solid var(--accent); font-weight: 500; }
+  .total-row .deficit-val { color: var(--accent); }
+  .timeline-item { display: flex; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .timeline-item:last-child { border-bottom: none; }
+  .timeline-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; background: var(--accent); }
+  .timeline-week { font-size: 0.7rem; color: var(--muted); min-width: 60px; }
+  .timeline-weight { font-family: var(--font-display); font-weight: 700; }
+  .timeline-lost { font-size: 0.7rem; color: var(--accent2); margin-left: auto; }
+  .cycling-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+  .cycling-row:last-child { border-bottom: none; }
+  .cycling-row .val { color: var(--accent2); font-weight: 500; }
+
+  .saving-indicator { font-size: 0.65rem; color: var(--muted); text-align: center; margin-top: 8px; min-height: 16px; transition: opacity 0.3s; }
+</style>
+</head>
+<body>
+
+<!-- ── Auth Screen ── -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">DEFICIT</div>
+    <div class="auth-sub">Calorie & Cycling Tracker</div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="showAuthTab('login')">Sign In</button>
+      <button class="auth-tab" onclick="showAuthTab('signup')">Sign Up</button>
+    </div>
+
+    <div id="auth-login">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="you@example.com">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')signIn()">
+      <div style="margin-top:16px">
+        <button class="btn btn-primary" style="width:100%" onclick="signIn()" id="signin-btn">Sign In</button>
+      </div>
+      <div class="auth-error" id="login-error"></div>
+    </div>
+
+    <div id="auth-signup" style="display:none">
+      <label>Email</label>
+      <input type="email" id="signup-email" placeholder="you@example.com">
+      <label>Password</label>
+      <input type="password" id="signup-password" placeholder="min. 6 characters" onkeydown="if(event.key==='Enter')signUp()">
+      <div style="margin-top:16px">
+        <button class="btn btn-primary" style="width:100%" onclick="signUp()" id="signup-btn">Create Account</button>
+      </div>
+      <div class="auth-error" id="signup-error"></div>
+      <div class="auth-success" id="signup-success"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── App Screen ── -->
+<div id="app-screen">
+
+<header>
+  <div>
+    <h1>DEFICIT</h1>
+    <p class="subtitle">Calorie & Cycling Tracker</p>
+  </div>
+  <div class="header-right">
+    <div class="header-stat">
+      <div class="val" id="header-deficit">—</div>
+      <div class="label">kcal deficit today</div>
+    </div>
+    <button class="btn-signout" onclick="signOut()">Sign out</button>
+  </div>
+</header>
+
+<!-- Setup -->
+<div class="grid">
+  <div class="card">
+    <div class="card-title">Your Stats</div>
+    <label>Current weight (kg)</label>
+    <input type="number" id="weight" value="85" step="0.1" oninput="recalc()">
+    <label>Height (cm)</label>
+    <input type="number" id="height" value="175" oninput="recalc()">
+    <label>Age</label>
+    <input type="number" id="age" value="35" oninput="recalc()">
+    <label>Sex</label>
+    <div class="radio-group">
+      <label><input type="radio" name="sex" value="m" checked onchange="recalc()"><span class="radio-btn">Male</span></label>
+      <label><input type="radio" name="sex" value="f" onchange="recalc()"><span class="radio-btn">Female</span></label>
+    </div>
+    <label>Target weight (kg)</label>
+    <input type="number" id="target" value="75" step="0.1" oninput="recalc()">
+  </div>
+
+  <div class="card">
+    <div class="card-title">Activity & Goals</div>
+    <label>Base activity (excl. cycling)</label>
+    <select id="activity" onchange="recalc()">
+      <option value="1.2">Sedentary (desk job)</option>
+      <option value="1.375" selected>Lightly active</option>
+      <option value="1.55">Moderately active</option>
+      <option value="1.725">Very active</option>
+    </select>
+    <label>Weekly deficit target</label>
+    <div class="radio-group">
+      <label><input type="radio" name="deficit" value="250" onchange="recalc()"><span class="radio-btn">Slow<br><small>0.25kg/wk</small></span></label>
+      <label><input type="radio" name="deficit" value="500" checked onchange="recalc()"><span class="radio-btn">Steady<br><small>0.5kg/wk</small></span></label>
+      <label><input type="radio" name="deficit" value="750" onchange="recalc()"><span class="radio-btn">Fast<br><small>0.75kg/wk</small></span></label>
+    </div>
+    <label>Commute distance (miles one way)</label>
+    <input type="number" id="commute" value="7.5" step="0.5" oninput="recalc()">
+    <label>Cycling pace</label>
+    <select id="pace" onchange="recalc()">
+      <option value="6">Casual (9 mph)</option>
+      <option value="8" selected>Moderate (11 mph)</option>
+      <option value="10">Brisk (14 mph)</option>
+      <option value="12">Fast (16+ mph)</option>
+    </select>
+  </div>
+</div>
+
+<!-- Today's numbers -->
+<div class="grid-3">
+  <div class="card stat-block">
+    <div class="card-title">TDEE (rest day)</div>
+    <div class="stat-big green" id="tdee">—</div>
+    <div class="stat-unit">kcal / day</div>
+  </div>
+  <div class="card stat-block">
+    <div class="card-title">Target intake</div>
+    <div class="stat-big cyan" id="target-cal">—</div>
+    <div class="stat-unit">kcal / day</div>
+  </div>
+  <div class="card stat-block">
+    <div class="card-title">Cycling bonus</div>
+    <div class="stat-big green" id="cycle-burn">—</div>
+    <div class="stat-unit">kcal (return trip)</div>
+  </div>
+</div>
+
+<!-- Daily breakdown -->
+<div class="section-full card">
+  <div class="card-title">Today's Calorie Plan</div>
+  <div class="breakdown-row"><span class="lbl">Basal Metabolic Rate (BMR)</span><span id="b-bmr">—</span></div>
+  <div class="breakdown-row"><span class="lbl">Activity multiplier (TDEE)</span><span id="b-tdee">—</span></div>
+  <div class="breakdown-row"><span class="lbl">Target daily deficit</span><span id="b-deficit">—</span></div>
+  <div class="breakdown-row"><span class="lbl">Cycling burn (if cycling today)</span><span id="b-cycle">—</span></div>
+  <div class="breakdown-row"><span class="lbl">☕ Breakfast (granola + milk + coffee)</span><span style="color:var(--accent2)">−300 kcal</span></div>
+  <div class="total-row">
+    <span>Remaining food budget</span>
+    <span id="b-total" class="deficit-val">—</span>
+  </div>
+  <div class="toggle-switch" onclick="toggleCycling()">
+    <div class="switch-track" id="switch-track"><div class="switch-thumb"></div></div>
+    <span class="switch-label">🚲 Cycling to office today</span>
+  </div>
+</div>
+
+<!-- Progress & Projection -->
+<div class="grid">
+  <div class="card">
+    <div class="card-title">Weight to goal</div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+      <span id="prog-current" style="font-family:var(--font-display);font-size:1.5rem;font-weight:700">—</span>
+      <span style="font-size:0.72rem;color:var(--muted)">→ <span id="prog-target">—</span> kg</span>
+    </div>
+    <div class="progress-wrap"><div class="progress-bar" id="prog-bar" style="width:0%"></div></div>
+    <div class="progress-label">
+      <span id="prog-lost">0 kg lost</span>
+      <span id="prog-left">— to go</span>
+    </div>
+    <div style="margin-top:16px">
+      <label>Log today's weight (kg)</label>
+      <input type="number" id="log-weight" step="0.1" placeholder="e.g. 84.3" oninput="updateWeightLog()">
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Projection to goal</div>
+    <div id="projection-list"></div>
+  </div>
+</div>
+
+<!-- Calendar -->
+<div class="card section-full">
+  <div class="calendar-header">
+    <button class="cal-nav" onclick="changeMonth(-1)">←</button>
+    <div class="cal-month" id="cal-month-label"></div>
+    <button class="cal-nav" onclick="changeMonth(1)">→</button>
+  </div>
+  <div class="cal-grid" id="cal-grid"></div>
+  <div style="display:flex;gap:20px;margin-top:16px;font-size:0.65rem;color:var(--muted)">
+    <span><span style="color:var(--accent)">■</span> Deficit day</span>
+    <span><span style="color:var(--red)">■</span> Surplus day</span>
+    <span>🚲 Cycled</span>
+  </div>
+</div>
+
+<!-- Cycling stats -->
+<div class="card">
+  <div class="card-title">Cycling Stats This Month</div>
+  <div class="cycling-row"><span>Days cycled</span><span class="val" id="cy-days">0</span></div>
+  <div class="cycling-row"><span>Total distance</span><span class="val" id="cy-dist">0 mi</span></div>
+  <div class="cycling-row"><span>Calories burned</span><span class="val" id="cy-kcal">0 kcal</span></div>
+  <div class="cycling-row"><span>Avg extra allowance</span><span class="val" id="cy-avg">0 kcal/ride</span></div>
+</div>
+
+</div><!-- end #app-screen -->
+
+<!-- ── Log Modal ── -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-date-title">Log Day</div>
+    <div class="modal-total">Total eaten: <span id="modal-total-kcal">300</span> kcal</div>
+
+    <div class="food-log-list" id="food-log-list">
+      <div class="food-log-breakfast">
+        <span class="fli-name">☕ Breakfast (granola + milk + coffee)</span>
+        <span class="fli-kcal">300 kcal</span>
+      </div>
+    </div>
+
+    <div class="card-title" style="margin-bottom:8px">Add food</div>
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('search')">🔍 Search</button>
+      <button class="tab-btn" onclick="switchTab('manual')">✏️ Manual</button>
+      <button class="tab-btn" onclick="switchTab('favourites')">⭐ Saved</button>
+    </div>
+
+    <!-- Search tab -->
+    <div class="tab-panel active" id="tab-search">
+      <div class="food-search-wrap">
+        <input type="text" id="food-search-input" placeholder="Search food or product…" onkeydown="if(event.key==='Enter')searchFood()">
+        <button class="btn-search" id="search-btn" onclick="searchFood()">Search</button>
+      </div>
+      <div class="search-status" id="search-status"></div>
+      <div class="search-results" id="search-results"></div>
+      <div class="portion-picker" id="portion-picker">
+        <div class="portion-name" id="portion-name"></div>
+        <div class="portion-row">
+          <input type="number" id="portion-grams" value="100" min="1" step="1" oninput="updatePortionKcal()">
+          <span class="portion-unit">g</span>
+          <span class="portion-kcal" id="portion-kcal-display">— kcal</span>
+        </div>
+        <button class="btn-add-food" onclick="addFoodToLog(false)">+ Add to today</button>
+        <button class="btn-add-food" style="margin-top:6px;background:rgba(77,240,160,0.1);border-color:var(--accent2);color:var(--accent2)" onclick="addFoodToLog(true)">+ Add & save to favourites ⭐</button>
+      </div>
+    </div>
+
+    <!-- Manual tab -->
+    <div class="tab-panel" id="tab-manual">
+      <div class="manual-row">
+        <div>
+          <label style="margin-top:0">Food name</label>
+          <input type="text" id="manual-name" placeholder="e.g. Waitrose chicken">
+        </div>
+        <div>
+          <label style="margin-top:0">kcal/100g</label>
+          <input type="number" id="manual-kcal100" placeholder="165" min="1" oninput="updateManualTotal()">
+        </div>
+        <div>
+          <label style="margin-top:0">Grams</label>
+          <input type="number" id="manual-grams" placeholder="150" min="1" oninput="updateManualTotal()">
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;margin-bottom:8px">
+        <span style="color:var(--muted)">Total:</span>
+        <span id="manual-total" style="color:var(--accent);font-weight:500">— kcal</span>
+      </div>
+      <button class="btn-add-manual" onclick="addManualFood(false)">+ Add to today</button>
+      <button class="btn-add-manual" style="margin-top:6px;border-color:var(--accent2);color:var(--accent2);background:rgba(77,240,160,0.08)" onclick="addManualFood(true)">+ Add & save to favourites ⭐</button>
+    </div>
+
+    <!-- Favourites tab -->
+    <div class="tab-panel" id="tab-favourites">
+      <div class="favourites-list" id="favourites-list"></div>
+      <div class="portion-picker" id="fav-portion-picker" style="margin-top:10px">
+        <div class="portion-name" id="fav-portion-name"></div>
+        <div class="portion-row">
+          <input type="number" id="fav-portion-grams" value="100" min="1" step="1" oninput="updateFavPortionKcal()">
+          <span class="portion-unit">g</span>
+          <span class="portion-kcal" id="fav-portion-kcal-display">— kcal</span>
+        </div>
+        <button class="btn-add-food" onclick="addFavToLog()">+ Add to today</button>
+      </div>
+    </div>
+
+    <div class="toggle-switch" onclick="toggleModalCycling()" style="margin-bottom:16px;margin-top:16px">
+      <div class="switch-track" id="modal-switch-track"><div class="switch-thumb"></div></div>
+      <span class="switch-label">🚲 Cycled to office this day</span>
+    </div>
+
+    <div class="saving-indicator" id="saving-indicator"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="clearDay()" id="modal-clear" style="display:none">Clear day</button>
+      <button class="btn btn-primary" onclick="saveDay()" id="save-btn">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Supabase ─────────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://jeuhlvnmmajddcddvnam.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpldWhsdm5tbWFqZGRjZGR2bmFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyMjc3MzAsImV4cCI6MjA5MjgwMzczMH0.mfkJkGkhTXm6dqerdZiqcJS04aZ24q60dRnqs13E7E4';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const BREAKFAST_KCAL = 300;
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let currentUser = null;
+let logs = {};        // { dateKey: { items, cycling } }
+let favourites = [];  // [{ id, name, kcal_per_100g }]
+let cyclingToday = false;
+let modalCycling = false;
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
+let selectedDay = null;
+let selectedFood = null;
+let modalFoodItems = [];
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+function showAuthTab(tab) {
+  document.getElementById('auth-login').style.display = tab === 'login' ? 'block' : 'none';
+  document.getElementById('auth-signup').style.display = tab === 'signup' ? 'block' : 'none';
+  document.querySelectorAll('.auth-tab').forEach((btn, i) => {
+    btn.classList.toggle('active', (i === 0 && tab === 'login') || (i === 1 && tab === 'signup'));
+  });
+}
+
+async function signIn() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const btn = document.getElementById('signin-btn');
+  const err = document.getElementById('login-error');
+  err.textContent = '';
+  btn.textContent = 'Signing in…';
+  btn.disabled = true;
+
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) {
+    err.textContent = error.message;
+    btn.textContent = 'Sign In';
+    btn.disabled = false;
+  }
+}
+
+async function signUp() {
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  const btn = document.getElementById('signup-btn');
+  const err = document.getElementById('signup-error');
+  const ok = document.getElementById('signup-success');
+  err.textContent = ''; ok.textContent = '';
+  btn.textContent = 'Creating…';
+  btn.disabled = true;
+
+  const { error } = await sb.auth.signUp({ email, password });
+  if (error) {
+    err.textContent = error.message;
+  } else {
+    ok.textContent = 'Account created! Check your email to confirm, then sign in.';
+  }
+  btn.textContent = 'Create Account';
+  btn.disabled = false;
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+  currentUser = null;
+  logs = {}; favourites = [];
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+}
+
+// ─── App init after login ─────────────────────────────────────────────────────
+async function initApp(user) {
+  currentUser = user;
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  await Promise.all([loadLogs(), loadFavourites()]);
+  recalc();
+  renderCalendar();
+}
+
+// ─── Database: Logs ──────────────────────────────────────────────────────────
+async function loadLogs() {
+  const { data } = await sb.from('logs').select('*').eq('user_id', currentUser.id);
+  logs = {};
+  (data || []).forEach(row => {
+    logs[row.date] = { items: row.items || [], cycling: row.cycling };
+  });
+}
+
+async function upsertLog(dateStr, items, cycling) {
+  await sb.from('logs').upsert({
+    user_id: currentUser.id,
+    date: dateStr,
+    items,
+    cycling
+  }, { onConflict: 'user_id,date' });
+}
+
+async function deleteLog(dateStr) {
+  await sb.from('logs').delete().eq('user_id', currentUser.id).eq('date', dateStr);
+}
+
+// ─── Database: Favourites ────────────────────────────────────────────────────
+async function loadFavourites() {
+  const { data } = await sb.from('favourites').select('*').eq('user_id', currentUser.id).order('name');
+  favourites = data || [];
+}
+
+async function insertFavourite(name, kcalPer100) {
+  if (favourites.find(f => f.name.toLowerCase() === name.toLowerCase())) return;
+  const { data } = await sb.from('favourites').insert({
+    user_id: currentUser.id,
+    name,
+    kcal_per_100g: kcalPer100
+  }).select().single();
+  if (data) favourites.push(data);
+}
+
+async function deleteFavourite(id) {
+  await sb.from('favourites').delete().eq('id', id);
+  favourites = favourites.filter(f => f.id !== id);
+}
+
+// ─── Calculations ─────────────────────────────────────────────────────────────
+function getBMR() {
+  const w = +document.getElementById('weight').value;
+  const h = +document.getElementById('height').value;
+  const a = +document.getElementById('age').value;
+  const sex = document.querySelector('input[name=sex]:checked').value;
+  if (!w || !h || !a) return 0;
+  return sex === 'm' ? 10*w + 6.25*h - 5*a + 5 : 10*w + 6.25*h - 5*a - 161;
+}
+
+function getCycleBurn() {
+  const distMiles = +document.getElementById('commute').value * 2;
+  const met = +document.getElementById('pace').value;
+  const w = +document.getElementById('weight').value;
+  const speedMph = [9,11,14,16][[6,8,10,12].indexOf(met)] || 11;
+  return Math.round(met * w * (distMiles / speedMph));
+}
+
+function getDayTotalKcal(key) {
+  const log = logs[key];
+  const itemTotal = log ? (log.items || []).reduce((s,i) => s + i.kcal, 0) : 0;
+  return BREAKFAST_KCAL + itemTotal;
+}
+
+function recalc() {
+  const bmr = getBMR();
+  const act = +document.getElementById('activity').value;
+  const deficitPerDay = +document.querySelector('input[name=deficit]:checked').value;
+  const tdee = Math.round(bmr * act);
+  const cycleBurn = getCycleBurn();
+  const targetCal = tdee - deficitPerDay;
+  const todayCal = cyclingToday ? targetCal + cycleBurn : targetCal;
+  const remainingCal = todayCal - BREAKFAST_KCAL;
+
+  document.getElementById('tdee').textContent = tdee || '—';
+  document.getElementById('target-cal').textContent = targetCal > 0 ? targetCal : '—';
+  document.getElementById('cycle-burn').textContent = cycleBurn || '—';
+  document.getElementById('b-bmr').textContent = bmr ? `${Math.round(bmr)} kcal` : '—';
+  document.getElementById('b-tdee').textContent = tdee ? `${tdee} kcal` : '—';
+  document.getElementById('b-deficit').textContent = deficitPerDay ? `−${deficitPerDay} kcal` : '—';
+  document.getElementById('b-cycle').textContent = cycleBurn ? `+${cycleBurn} kcal` : '—';
+  document.getElementById('b-total').textContent = remainingCal > 0 ? `${remainingCal} kcal` : '—';
+
+  const todayKey = dateKey(new Date());
+  if (logs[todayKey]) {
+    const effectiveTDEE = logs[todayKey].cycling ? tdee + cycleBurn : tdee;
+    const def = effectiveTDEE - getDayTotalKcal(todayKey);
+    document.getElementById('header-deficit').textContent = (def > 0 ? '+' : '') + def;
+  } else {
+    document.getElementById('header-deficit').textContent = '—';
+  }
+
+  updateProjection();
+  updateProgress();
+}
+
+function updateProgress() {
+  const current = +document.getElementById('weight').value;
+  const target = +document.getElementById('target').value;
+  if (!current || !target) return;
+  const toGo = Math.max(0, current - target);
+  document.getElementById('prog-current').textContent = current + ' kg';
+  document.getElementById('prog-target').textContent = target;
+  document.getElementById('prog-lost').textContent = `0 kg lost`;
+  document.getElementById('prog-left').textContent = `${toGo.toFixed(1)} kg to go`;
+  document.getElementById('prog-bar').style.width = '0%';
+}
+
+function updateWeightLog() {
+  const val = +document.getElementById('log-weight').value;
+  if (val > 0) { document.getElementById('weight').value = val; recalc(); }
+}
+
+function updateProjection() {
+  const current = +document.getElementById('weight').value;
+  const target = +document.getElementById('target').value;
+  const deficitPerDay = +document.querySelector('input[name=deficit]:checked').value;
+  const weeklyDeficit = deficitPerDay * 7 + (4 * getCycleBurn());
+  const weeklyLoss = weeklyDeficit / 7700;
+  const list = document.getElementById('projection-list');
+  list.innerHTML = '';
+  if (!current || !target || current <= target) return;
+  let w = current, weeks = 0;
+  const items = [];
+  while (w > target && weeks < 52) {
+    weeks++;
+    w = Math.max(target, w - weeklyLoss);
+    if (weeks % 2 === 0 || w <= target) items.push({ week: weeks, weight: w });
+    if (items.length >= 6) break;
+  }
+  items.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'timeline-item';
+    el.innerHTML = `<div class="timeline-dot"></div><span class="timeline-week">Wk ${item.week}</span><span class="timeline-weight">${item.weight.toFixed(1)} kg</span><span class="timeline-lost">−${(current - item.weight).toFixed(1)} kg</span>`;
+    list.appendChild(el);
+  });
+}
+
+// ─── Calendar ─────────────────────────────────────────────────────────────────
+function dateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function renderCalendar() {
+  const grid = document.getElementById('cal-grid');
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-month-label').textContent = `${months[currentMonth]} ${currentYear}`;
+  grid.innerHTML = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => `<div class="cal-day-name">${d}</div>`).join('');
+
+  const first = new Date(currentYear, currentMonth, 1);
+  let startDow = first.getDay();
+  startDow = startDow === 0 ? 6 : startDow - 1;
+  for (let i = 0; i < startDow; i++) grid.innerHTML += '<div class="cal-day empty"></div>';
+
+  const bmr = getBMR(), act = +document.getElementById('activity').value;
+  const tdee = Math.round(bmr * act), cycleBurn = getCycleBurn();
+  const commute = +document.getElementById('commute').value;
+  let cyDays = 0, cyDist = 0, cyKcal = 0;
+  const today = new Date();
+
+  for (let d = 1; d <= new Date(currentYear, currentMonth+1, 0).getDate(); d++) {
+    const key = dateKey(new Date(currentYear, currentMonth, d));
+    const log = logs[key];
+    const isToday = key === dateKey(today);
+    let cls = 'cal-day' + (isToday ? ' today' : '');
+    let dot = '';
+    if (log) {
+      cls += ' logged';
+      const effectiveTDEE = log.cycling ? tdee + cycleBurn : tdee;
+      const eaten = getDayTotalKcal(key);
+      cls += eaten < effectiveTDEE ? ' deficit' : ' surplus';
+      dot = `<div class="day-dot ${eaten < effectiveTDEE ? 'green' : 'red'}"></div>`;
+      if (log.cycling) { cls += ' cycling'; cyDays++; cyDist += commute*2; cyKcal += cycleBurn; }
+    }
+    grid.innerHTML += `<div class="${cls}" onclick="openModal(${d})">${d}${dot}</div>`;
+  }
+
+  document.getElementById('cy-days').textContent = cyDays;
+  document.getElementById('cy-dist').textContent = cyDist.toFixed(1) + ' mi';
+  document.getElementById('cy-kcal').textContent = cyKcal + ' kcal';
+  document.getElementById('cy-avg').textContent = cyDays > 0 ? Math.round(cyKcal/cyDays) + ' kcal/ride' : '0 kcal/ride';
+}
+
+function changeMonth(dir) {
+  currentMonth += dir;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  renderCalendar();
+}
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+function openModal(day) {
+  selectedDay = day;
+  const key = dateKey(new Date(currentYear, currentMonth, day));
+  const log = logs[key] || {};
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('modal-date-title').textContent = `${day} ${months[currentMonth]} ${currentYear}`;
+  modalFoodItems = (log.items || []).map(i => ({...i}));
+  modalCycling = log.cycling || false;
+  updateModalSwitch();
+  renderModalFoodList();
+  resetSearch();
+  document.getElementById('modal-clear').style.display = log.items && log.items.length > 0 ? 'block' : 'none';
+  document.getElementById('saving-indicator').textContent = '';
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  selectedDay = null;
+  resetSearch();
+}
+
+async function saveDay() {
+  const btn = document.getElementById('save-btn');
+  const ind = document.getElementById('saving-indicator');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  ind.textContent = '';
+
+  const key = dateKey(new Date(currentYear, currentMonth, selectedDay));
+  logs[key] = { items: modalFoodItems, cycling: modalCycling };
+  await upsertLog(key, modalFoodItems, modalCycling);
+
+  ind.textContent = '✓ Saved to cloud';
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.textContent = 'Save';
+    closeModal();
+    renderCalendar();
+    recalc();
+  }, 600);
+}
+
+async function clearDay() {
+  const key = dateKey(new Date(currentYear, currentMonth, selectedDay));
+  delete logs[key];
+  await deleteLog(key);
+  closeModal();
+  renderCalendar();
+  recalc();
+}
+
+// ─── Food log rendering ───────────────────────────────────────────────────────
+function renderModalFoodList() {
+  const list = document.getElementById('food-log-list');
+  const itemTotal = modalFoodItems.reduce((s,i) => s + i.kcal, 0);
+  const grandTotal = BREAKFAST_KCAL + itemTotal;
+  document.getElementById('modal-total-kcal').textContent = grandTotal;
+
+  list.innerHTML = `<div class="food-log-breakfast"><span class="fli-name">☕ Breakfast (granola + milk + coffee)</span><span class="fli-kcal">${BREAKFAST_KCAL} kcal</span></div>`;
+
+  modalFoodItems.forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.className = 'food-log-item';
+    row.innerHTML = `<div class="fli-name">${item.name}<div class="fli-portion">${item.grams}g</div></div><span class="fli-kcal">${item.kcal} kcal</span><span class="fli-remove" onclick="removeFoodItem(${idx})">✕</span>`;
+    list.appendChild(row);
+  });
+
+  if (modalFoodItems.length > 0) {
+    const t = document.createElement('div');
+    t.className = 'food-total-row';
+    t.innerHTML = `<span>Total</span><span class="total-kcal">${grandTotal} kcal</span>`;
+    list.appendChild(t);
+  }
+}
+
+function removeFoodItem(idx) {
+  modalFoodItems.splice(idx, 1);
+  renderModalFoodList();
+}
+
+// ─── Food search ──────────────────────────────────────────────────────────────
+async function searchFood() {
+  const query = document.getElementById('food-search-input').value.trim();
+  if (!query) return;
+  const btn = document.getElementById('search-btn');
+  const status = document.getElementById('search-status');
+  const results = document.getElementById('search-results');
+  btn.disabled = true; btn.textContent = '…';
+  status.style.display = 'block'; status.textContent = 'Searching…';
+  results.classList.remove('open'); results.innerHTML = '';
+  hidePortion();
+
+  try {
+    const res = await fetch(`https://world.openfoodfacts.org/api/v2/search?search_terms=${encodeURIComponent(query)}&page_size=15&fields=product_name,brands,nutriments`);
+    const data = await res.json();
+    const products = (data.products || []).filter(p => p.product_name && p.nutriments && p.nutriments['energy-kcal_100g'] > 0);
+
+    if (products.length === 0) {
+      status.textContent = 'No results — try Manual entry or save a favourite instead.';
+    } else {
+      status.style.display = 'none';
+      results.classList.add('open');
+      products.slice(0,8).forEach(p => {
+        const kcalPer100 = Math.round(p.nutriments['energy-kcal_100g']);
+        const brand = p.brands ? p.brands.split(',')[0].trim() : '';
+        const item = document.createElement('div');
+        item.className = 'search-result-item';
+        item.innerHTML = `<div class="sri-name">${p.product_name}</div><div class="sri-meta">${brand ? brand+' · ' : ''}<span class="sri-kcal">${kcalPer100} kcal/100g</span></div>`;
+        item.onclick = () => selectFood(p.product_name, kcalPer100);
+        results.appendChild(item);
+      });
+    }
+  } catch(e) {
+    status.style.display = 'block';
+    status.textContent = `Search failed: ${e.message}. Try Manual entry tab.`;
+  }
+  btn.disabled = false; btn.textContent = 'Search';
+}
+
+function selectFood(name, kcalPer100) {
+  selectedFood = { name, kcalPer100 };
+  document.getElementById('portion-name').textContent = name;
+  document.getElementById('portion-grams').value = 100;
+  updatePortionKcal();
+  document.getElementById('portion-picker').classList.add('open');
+  document.getElementById('search-results').classList.remove('open');
+}
+
+function updatePortionKcal() {
+  if (!selectedFood) return;
+  const g = +document.getElementById('portion-grams').value || 0;
+  document.getElementById('portion-kcal-display').textContent = `${Math.round(selectedFood.kcalPer100 * g / 100)} kcal`;
+}
+
+function addFoodToLog(saveToFavs) {
+  if (!selectedFood) return;
+  const g = +document.getElementById('portion-grams').value || 0;
+  if (g <= 0) return;
+  const kcal = Math.round(selectedFood.kcalPer100 * g / 100);
+  modalFoodItems.push({ name: selectedFood.name, grams: g, kcal });
+  if (saveToFavs) insertFavourite(selectedFood.name, selectedFood.kcalPer100);
+  renderModalFoodList();
+  hidePortion();
+  document.getElementById('food-search-input').value = '';
+  document.getElementById('modal-clear').style.display = 'block';
+}
+
+function hidePortion() {
+  document.getElementById('portion-picker').classList.remove('open');
+  document.getElementById('fav-portion-picker').classList.remove('open');
+  selectedFood = null;
+}
+
+function resetSearch() {
+  document.getElementById('food-search-input').value = '';
+  document.getElementById('search-results').classList.remove('open');
+  document.getElementById('search-results').innerHTML = '';
+  document.getElementById('search-status').style.display = 'none';
+  hidePortion();
+}
+
+// ─── Manual entry ─────────────────────────────────────────────────────────────
+function updateManualTotal() {
+  const k = +document.getElementById('manual-kcal100').value || 0;
+  const g = +document.getElementById('manual-grams').value || 0;
+  document.getElementById('manual-total').textContent = k && g ? `${Math.round(k*g/100)} kcal` : '— kcal';
+}
+
+function addManualFood(saveToFavs) {
+  const name = document.getElementById('manual-name').value.trim();
+  const kcal100 = +document.getElementById('manual-kcal100').value || 0;
+  const g = +document.getElementById('manual-grams').value || 0;
+  if (!name || !kcal100 || !g) { alert('Please fill in all three fields.'); return; }
+  const kcal = Math.round(kcal100 * g / 100);
+  modalFoodItems.push({ name, grams: g, kcal });
+  if (saveToFavs) insertFavourite(name, kcal100);
+  renderModalFoodList();
+  document.getElementById('manual-name').value = '';
+  document.getElementById('manual-kcal100').value = '';
+  document.getElementById('manual-grams').value = '';
+  document.getElementById('manual-total').textContent = '— kcal';
+  document.getElementById('modal-clear').style.display = 'block';
+}
+
+// ─── Favourites ───────────────────────────────────────────────────────────────
+function renderFavourites() {
+  const list = document.getElementById('favourites-list');
+  if (favourites.length === 0) {
+    list.innerHTML = '<div class="fav-empty">No saved foods yet.<br>Add items and tap "Save to favourites ⭐"</div>';
+    return;
+  }
+  list.innerHTML = '';
+  favourites.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'fav-item';
+    row.innerHTML = `<span class="fav-name">${f.name}</span><span class="fav-kcal">${f.kcal_per_100g} kcal/100g</span><span class="fav-remove" onclick="event.stopPropagation();removeFav('${f.id}')">✕</span>`;
+    row.onclick = () => selectFavourite(f);
+    list.appendChild(row);
+  });
+}
+
+async function removeFav(id) {
+  await deleteFavourite(id);
+  renderFavourites();
+}
+
+function selectFavourite(f) {
+  selectedFood = { name: f.name, kcalPer100: f.kcal_per_100g };
+  document.getElementById('fav-portion-name').textContent = f.name;
+  document.getElementById('fav-portion-grams').value = 100;
+  updateFavPortionKcal();
+  document.getElementById('fav-portion-picker').classList.add('open');
+}
+
+function updateFavPortionKcal() {
+  if (!selectedFood) return;
+  const g = +document.getElementById('fav-portion-grams').value || 0;
+  document.getElementById('fav-portion-kcal-display').textContent = `${Math.round(selectedFood.kcalPer100 * g / 100)} kcal`;
+}
+
+function addFavToLog() {
+  if (!selectedFood) return;
+  const g = +document.getElementById('fav-portion-grams').value || 0;
+  if (g <= 0) return;
+  const kcal = Math.round(selectedFood.kcalPer100 * g / 100);
+  modalFoodItems.push({ name: selectedFood.name, grams: g, kcal });
+  renderModalFoodList();
+  document.getElementById('fav-portion-picker').classList.remove('open');
+  selectedFood = null;
+  document.getElementById('modal-clear').style.display = 'block';
+}
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  ['search','manual','favourites'].forEach((t, i) => {
+    document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+    document.querySelectorAll('.tab-btn')[i].classList.toggle('active', t === tab);
+  });
+  if (tab === 'favourites') renderFavourites();
+  hidePortion();
+}
+
+// ─── Cycling toggles ──────────────────────────────────────────────────────────
+function toggleCycling() {
+  cyclingToday = !cyclingToday;
+  document.getElementById('switch-track').className = 'switch-track' + (cyclingToday ? ' on' : '');
+  recalc();
+}
+
+function toggleModalCycling() {
+  modalCycling = !modalCycling;
+  updateModalSwitch();
+}
+
+function updateModalSwitch() {
+  document.getElementById('modal-switch-track').className = 'switch-track' + (modalCycling ? ' on' : '');
+}
+
+// ─── Close modal on overlay click ─────────────────────────────────────────────
+document.getElementById('modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (session?.user) {
+    await initApp(session.user);
+  } else {
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('app-screen').style.display = 'none';
+  }
+});
+</script>
+</body>
+</html>
