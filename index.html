@@ -1016,16 +1016,36 @@ async function searchFood() {
   hidePortion();
 
   try {
-    const res = await fetch(`https://world.openfoodfacts.org/api/v2/search?search_terms=${encodeURIComponent(query)}&page_size=15&fields=product_name,brands,nutriments`);
-    const data = await res.json();
-    const products = (data.products || []).filter(p => p.product_name && p.nutriments && p.nutriments['energy-kcal_100g'] > 0);
+    // Try UK-specific results first, fall back to global
+    const ukUrl = `https://world.openfoodfacts.org/api/v2/search?search_terms=${encodeURIComponent(query)}&countries_tags=en:united-kingdom&page_size=10&fields=product_name,brands,nutriments`;
+    const globalUrl = `https://world.openfoodfacts.org/api/v2/search?search_terms=${encodeURIComponent(query)}&page_size=15&fields=product_name,brands,nutriments`;
+
+    const ukRes = await fetch(ukUrl);
+    const ukData = await ukRes.json();
+    let products = (ukData.products || []).filter(p => p.product_name && p.nutriments && p.nutriments['energy-kcal_100g'] > 0);
+
+    // If fewer than 3 UK results, supplement with global
+    if (products.length < 3) {
+      const globalRes = await fetch(globalUrl);
+      const globalData = await globalRes.json();
+      const globalProducts = (globalData.products || []).filter(p => p.product_name && p.nutriments && p.nutriments['energy-kcal_100g'] > 0);
+      // Merge, deduplicating by name
+      const seen = new Set(products.map(p => p.product_name.toLowerCase()));
+      for (const p of globalProducts) {
+        if (!seen.has(p.product_name.toLowerCase())) {
+          products.push(p);
+          seen.add(p.product_name.toLowerCase());
+        }
+        if (products.length >= 10) break;
+      }
+    }
 
     if (products.length === 0) {
       status.textContent = 'No results — try Manual entry or save a favourite instead.';
     } else {
       status.style.display = 'none';
       results.classList.add('open');
-      products.slice(0,8).forEach(p => {
+      products.slice(0,10).forEach(p => {
         const kcalPer100 = Math.round(p.nutriments['energy-kcal_100g']);
         const brand = p.brands ? p.brands.split(',')[0].trim() : '';
         const item = document.createElement('div');
